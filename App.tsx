@@ -4,35 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 
-// TODO: 나중에 실제 Next.js 프로젝트 URL로 교체
-const TEST_HTML = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f2f2f7; }
-    button { padding: 16px 24px; font-size: 17px; border-radius: 12px; border: none; background: #007aff; color: white; margin-bottom: 20px; }
-    img { max-width: 90%; border-radius: 12px; }
-  </style>
-</head>
-<body>
-  <button onclick="requestPhoto()">사진 찍기</button>
-  <img id="photo" />
-  <script>
-    function requestPhoto() {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OPEN_CAMERA' }));
-    }
-    window.addEventListener('message', function (event) {
-      var data = JSON.parse(event.data);
-      if (data.type === 'PHOTO_CAPTURED') {
-        document.getElementById('photo').src = 'data:image/jpeg;base64,' + data.base64;
-      }
-    });
-  </script>
-</body>
-</html>
-`;
+const WEBVIEW_URL = 'https://sayit-web-phi.vercel.app/';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -69,7 +41,7 @@ export default function App() {
     <View style={styles.container}>
       <WebView
         ref={webviewRef}
-        source={{ html: TEST_HTML }}
+        source={{ uri: WEBVIEW_URL }}
         onMessage={handleWebMessage}
         style={styles.webview}
       />
