@@ -4,8 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import WebScreen from './screens/WebScreen';
 import type { RootStackParamList } from './navigation/types';
-
-const WEBVIEW_URL = 'https://sayit-web-phi.vercel.app/';
+import { WEBVIEW_URL } from './config';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

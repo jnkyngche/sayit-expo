@@ -7,8 +7,13 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import type { RootStackParamList } from '../navigation/types';
 import type { WebToNativeMessage } from '../bridge/webMessages';
+import { WEBVIEW_URL } from '../config';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebScreen'>;
+
+function resolveWebViewUrl(possiblyRelativeUrl: string): string {
+  return new URL(possiblyRelativeUrl, WEBVIEW_URL).toString();
+}
 
 export default function WebScreen({ route, navigation }: Props) {
   const { url } = route.params;
@@ -55,7 +60,7 @@ export default function WebScreen({ route, navigation }: Props) {
         return;
       }
       case 'NAVIGATE_PUSH': {
-        navigation.push('WebScreen', { url: data.url, title: data.title });
+        navigation.push('WebScreen', { url: resolveWebViewUrl(data.url), title: data.title });
         return;
       }
       case 'NAVIGATE_POP': {
