@@ -7,7 +7,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import type { RootStackParamList } from '../navigation/types';
 import type { WebToNativeMessage } from '../bridge/webMessages';
-import { WEBVIEW_URL } from '../config';
+import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from '../config';
+import BouncingDotsLoader from '../components/BouncingDotsLoader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebScreen'>;
 
@@ -90,6 +91,12 @@ export default function WebScreen({ route, navigation }: Props) {
             canGoBackRef.current = nav.canGoBack;
           }}
           style={styles.webview}
+          startInLoadingState
+          renderLoading={() => (
+            <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+              <BouncingDotsLoader />
+            </View>
+          )}
         />
       </View>
       {cameraOpen && (
@@ -116,8 +123,13 @@ export default function WebScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  webviewWrapper: { flex: 1, backgroundColor: '#fff' },
-  webview: { flex: 1 },
+  webviewWrapper: { flex: 1, backgroundColor: WEBVIEW_BACKGROUND_COLOR },
+  webview: { flex: 1, backgroundColor: WEBVIEW_BACKGROUND_COLOR },
+  loadingOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: WEBVIEW_BACKGROUND_COLOR,
+  },
   cancelButton: {
     position: 'absolute',
     top: 60,
