@@ -67,35 +67,56 @@ export default function WebScreen({ route, navigation }: Props) {
     const data = JSON.parse(event.nativeEvent.data) as WebToNativeMessage;
     switch (data.type) {
       case 'SCAN_START': {
-        const shot = await capture();
-        if (shot.status === 'denied') {
-          postToWeb({ type: 'SCAN_DENIED' });
-          return;
-        }
-        if (shot.status !== 'ok') {
-          postToWeb({ type: 'SCAN_CANCELLED' });
-          return;
-        }
+        // 스캐너가 던지면(카메라 하드웨어 오류 등) 웹의 버튼이 'scanning'으로 잠긴 채 남는다.
+        // 어떤 경로로든 반드시 답을 보낸다.
+        try {
+          const shot = await capture();
+          if (shot.status === 'denied') {
+            postToWeb({ type: 'SCAN_DENIED' });
+            return;
+          }
+          if (shot.status !== 'ok') {
+            postToWeb({ type: 'SCAN_CANCELLED' });
+            return;
+          }
 
-        const sessionId = createSessionId();
-        saveSession(sessionId, shot.uri);
-        postToWeb({ type: 'SCAN_RESULT', sessionId });
+          const sessionId = createSessionId();
+          saveSession(sessionId, shot.uri);
+          postToWeb({ type: 'SCAN_RESULT', sessionId });
+        } catch {
+          postToWeb({ type: 'SCAN_CANCELLED' });
+        }
         return;
       }
       case 'SCAN_SESSION_GET': {
         const uri = getSessionUri(data.sessionId);
-        if (!uri) return; // 연속 촬영으로 세션이 이미 교체됨 — 웹이 빈 상태로 처리
-        // 순차로 돌린다 — Promise.all로 겹치면 12MP 원본을 동시에 두 번 디코딩하게 되고
-        // (장당 약 48MB) 저사양 Android에서 그대로 OOM이다. 어차피 사용자는 둘 다 기다린다.
-        const thumb = await thumbDataUrl(uri);
-        const lines = await recognize(uri);
-        postToWeb({ type: 'SCAN_SESSION_GET_OK', sessionId: data.sessionId, thumb, lines });
+        if (!uri) {
+          // 연속 촬영으로 세션이 이미 교체됨
+          postToWeb({ type: 'SCAN_SESSION_GET_ERROR', sessionId: data.sessionId, reason: 'expired' });
+          return;
+        }
+        try {
+          // 순차로 돌린다 — Promise.all로 겹치면 12MP 원본을 동시에 두 번 디코딩하게 되고
+          // (장당 약 48MB) 저사양 Android에서 그대로 OOM이다. 어차피 사용자는 둘 다 기다린다.
+          const thumb = await thumbDataUrl(uri);
+          const lines = await recognize(uri);
+          postToWeb({ type: 'SCAN_SESSION_GET_OK', sessionId: data.sessionId, thumb, lines });
+        } catch {
+          postToWeb({ type: 'SCAN_SESSION_GET_ERROR', sessionId: data.sessionId, reason: 'failed' });
+        }
         return;
       }
       case 'SCAN_FULL_IMAGE_REQUEST': {
         const uri = getSessionUri(data.sessionId);
-        if (!uri) return;
-        postToWeb({ type: 'SCAN_FULL_IMAGE_OK', sessionId: data.sessionId, dataUrl: await fullImageDataUrl(uri) });
+        if (!uri) {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_ERROR', sessionId: data.sessionId, reason: 'expired' });
+          return;
+        }
+        try {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_OK', sessionId: data.sessionId, dataUrl: await fullImageDataUrl(uri) });
+        } catch {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_ERROR', sessionId: data.sessionId, reason: 'failed' });
+        }
         return;
       }
       case 'NAVIGATE_PUSH': {

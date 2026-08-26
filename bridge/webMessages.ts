@@ -59,7 +59,11 @@ export type NativeToWebMessage =
   | { type: 'SCAN_CANCELLED' }
   | { type: 'SCAN_DENIED' }
   | { type: 'SCAN_SESSION_GET_OK'; sessionId: string; thumb: string; lines: Line[] }
+  // 실패해도 반드시 답을 보낸다 — 침묵하면 웹은 로딩 스켈레톤에서 영원히 못 빠져나온다.
+  // 'expired'는 연속 촬영으로 세션이 교체된 경우, 'failed'는 디코딩/인식이 던진 경우다.
+  | { type: 'SCAN_SESSION_GET_ERROR'; sessionId: string; reason: 'expired' | 'failed' }
   | { type: 'SCAN_FULL_IMAGE_OK'; sessionId: string; dataUrl: string }
+  | { type: 'SCAN_FULL_IMAGE_ERROR'; sessionId: string; reason: 'expired' | 'failed' }
   | { type: 'AUDIO_STATE'; key: string; state: AudioState }
   | { type: 'LIBRARY_FOLDERS_OK'; folders: Folder[] }
   | { type: 'LIBRARY_CREATE_FOLDER_OK'; folder: Folder }
