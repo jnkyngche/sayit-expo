@@ -27,7 +27,7 @@ export async function capture(): Promise<CaptureResult> {
     : { status: 'cancelled' };
 }
 
-/** 플랫폼별(iOS Vision / Android ML Kit) 반환 구조를 하나의 Line[]으로 눌러 담는다. */
+/** ML Kit(iOS/Android 공통) 반환 구조를 하나의 Line[]으로 눌러 담는다. */
 export async function recognize(uri: string): Promise<Line[]> {
   const { width: iw, height: ih } = await getImageSize(uri);
 
@@ -37,13 +37,21 @@ export async function recognize(uri: string): Promise<Line[]> {
 
   return result.blocks
     .flatMap((block) => block.lines)
-    .map((line) => ({
-      text: line.lineText.replace(/\s+/g, ' ').trim(),
-      x: line.lineFrame.x / iw,
-      y: line.lineFrame.y / ih,
-      w: line.lineFrame.width / iw,
-      h: line.lineFrame.height / ih,
-    }))
+    .map((line) => {
+      // lineFrame.x/y는 쓰면 안 된다. 라이브러리의 boundingFrame()이 원점 대신
+      // x = left/2 + width/4, y = 1.5*top - height/4 을 돌려준다(iOS·Android 동일 버그,
+      // HybridTextRecognizer의 boundingFrame 참고). y가 1.5배로 부풀어서 페이지 아래쪽
+      // 줄은 정규화 값이 1을 넘고, 하이라이트 박스가 썸네일 밖으로 나가버린다.
+      // 같은 struct의 boundingCenterX/Y는 양쪽 다 정상이라 거기서 원점을 되계산한다.
+      const frame = line.lineFrame;
+      return {
+        text: line.lineText.replace(/\s+/g, ' ').trim(),
+        x: (frame.boundingCenterX - frame.width / 2) / iw,
+        y: (frame.boundingCenterY - frame.height / 2) / ih,
+        w: frame.width / iw,
+        h: frame.height / ih,
+      };
+    })
     .filter((line) => line.text.length > 0);
 }
 
