@@ -85,7 +85,10 @@ export default function WebScreen({ route, navigation }: Props) {
       case 'SCAN_SESSION_GET': {
         const uri = getSessionUri(data.sessionId);
         if (!uri) return; // 연속 촬영으로 세션이 이미 교체됨 — 웹이 빈 상태로 처리
-        const [thumb, lines] = await Promise.all([thumbDataUrl(uri), recognize(uri)]);
+        // 순차로 돌린다 — Promise.all로 겹치면 12MP 원본을 동시에 두 번 디코딩하게 되고
+        // (장당 약 48MB) 저사양 Android에서 그대로 OOM이다. 어차피 사용자는 둘 다 기다린다.
+        const thumb = await thumbDataUrl(uri);
+        const lines = await recognize(uri);
         postToWeb({ type: 'SCAN_SESSION_GET_OK', sessionId: data.sessionId, thumb, lines });
         return;
       }
