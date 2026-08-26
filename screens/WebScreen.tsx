@@ -17,6 +17,7 @@ import {
   insertSentence,
   listFolders,
   listSentences,
+  renameFolder,
 } from '../lib/db';
 import { enqueue } from '../lib/download-queue';
 import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from '../config';
@@ -95,6 +96,10 @@ export default function WebScreen({ route, navigation }: Props) {
       }
       case 'LIBRARY_CREATE_FOLDER': {
         postToWeb({ type: 'LIBRARY_CREATE_FOLDER_OK', folder: createFolder(data.name) });
+        return;
+      }
+      case 'LIBRARY_RENAME_FOLDER': {
+        postToWeb({ type: 'LIBRARY_RENAME_FOLDER_OK', folder: renameFolder(data.folderId, data.name) });
         return;
       }
       case 'LIBRARY_LIST': {
