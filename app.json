@@ -16,20 +16,21 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "사진 촬영을 위해 카메라 접근 권한이 필요합니다."
-        }
-      ],
       "expo-sqlite",
-      "expo-audio"
+      "expo-audio",
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "교재를 촬영해 영어 문장을 인식합니다."
+        }
+      ]
     ]
   }
 }
