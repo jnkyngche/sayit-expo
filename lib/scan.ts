@@ -1,7 +1,7 @@
 import { Image } from 'react-native';
 import { Camera } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import DocumentScanner, { ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import { PhotoRecognizer } from 'react-native-vision-camera-ocr-plus';
@@ -23,8 +23,32 @@ export async function capture(): Promise<CaptureResult> {
   });
 
   return status === ScanDocumentResponseStatus.Success && scannedImages?.[0]
-    ? { status: 'ok', uri: scannedImages[0] }
+    ? { status: 'ok', uri: adoptIntoCache(scannedImages[0]) }
     : { status: 'cancelled' };
+}
+
+/**
+ * 스캐너가 저장한 원본을 캐시 디렉터리로 옮긴다.
+ *
+ * iOS 플러그인은 Documents/에 저장하는데(react-native-document-scanner-plugin의
+ * FileUtil.createImageFile), 거기 있는 파일은 iCloud 백업 대상이고 OS가 회수하지도 않는다.
+ * 앱이 다음 촬영 전에 종료되면 discardSession이 못 돌아 12MP JPEG가 그대로 남는다 —
+ * 실행할 때마다 한 장씩 사용자 백업 용량을 먹는 셈이다. 재촬영하면 다시 만들 수 있는
+ * 임시 이미지이므로 캐시가 맞는 자리다.
+ *
+ * Android의 content:// URI는 우리가 만든 파일이 아니라 손대지 않고 그대로 쓴다.
+ */
+function adoptIntoCache(uri: string): string {
+  if (!uri.startsWith('file://')) return uri;
+  try {
+    const source = new File(uri);
+    if (!source.exists) return uri;
+    source.moveSync(new File(Paths.cache, `scan-${Date.now()}.jpg`));
+    return source.uri; // moveSync는 uri를 새 위치로 갱신한다
+  } catch {
+    // 옮기지 못해도 인식 자체는 원래 경로로 계속 진행할 수 있다 — 촬영을 실패시키지 않는다.
+    return uri;
+  }
 }
 
 /** ML Kit(iOS/Android 공통) 반환 구조를 하나의 Line[]으로 눌러 담는다. */
