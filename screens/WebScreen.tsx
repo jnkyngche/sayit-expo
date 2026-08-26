@@ -91,6 +91,9 @@ export default function WebScreen({ route, navigation }: Props) {
             canGoBackRef.current = nav.canGoBack;
           }}
           style={styles.webview}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          ignoreSilentHardwareSwitch
           startInLoadingState
           renderLoading={() => (
             <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
