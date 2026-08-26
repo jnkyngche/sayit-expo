@@ -110,6 +110,15 @@ export function createFolder(name: string): Folder {
   return { id, name, sentenceCount: 0 };
 }
 
+export function renameFolder(id: string, name: string): Folder {
+  db.runSync('UPDATE folder SET name = ? WHERE id = ?', [name, id]);
+  const { n } = db.getFirstSync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM saved_sentence WHERE folder_id = ?',
+    [id]
+  )!;
+  return { id, name, sentenceCount: n };
+}
+
 export function getSentenceById(sentenceId: string): SentenceSummary | null {
   const row = db.getFirstSync<SentenceRow>('SELECT * FROM saved_sentence WHERE id = ?', [sentenceId]);
   return row ? toSentenceSummary(row) : null;

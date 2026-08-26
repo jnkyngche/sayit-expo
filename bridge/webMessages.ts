@@ -8,6 +8,7 @@ export type WebToNativeMessage =
   | { type: 'NAVIGATE_POP' }
   | { type: 'LIBRARY_FOLDERS' }
   | { type: 'LIBRARY_CREATE_FOLDER'; name: string }
+  | { type: 'LIBRARY_RENAME_FOLDER'; folderId: string; name: string }
   | { type: 'LIBRARY_LIST'; folderId: string; cursor?: string }
   | {
       type: 'LIBRARY_SAVE';
@@ -49,6 +50,7 @@ export type NativeToWebMessage =
   | { type: 'AUDIO_STATE'; key: string; state: AudioState }
   | { type: 'LIBRARY_FOLDERS_OK'; folders: Folder[] }
   | { type: 'LIBRARY_CREATE_FOLDER_OK'; folder: Folder }
+  | { type: 'LIBRARY_RENAME_FOLDER_OK'; folder: Folder }
   | { type: 'LIBRARY_LIST_OK'; folderId: string; sentences: SentenceSummary[]; nextCursor: string | null }
   | { type: 'LIBRARY_SAVE_OK'; sentence: SentenceSummary }
   | { type: 'LIBRARY_DELETE_OK'; sentenceId: string }
