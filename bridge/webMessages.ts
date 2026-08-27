@@ -3,7 +3,9 @@
 // Word/Folder 필드 이름은 sayIt-web의 src/types/sentence.ts, src/types/folder.ts와 맞춘 것이다 —
 // 둘 중 하나만 바꾸면 계약이 어긋나니 같이 수정한다.
 export type WebToNativeMessage =
-  | { type: 'OPEN_CAMERA' }
+  | { type: 'SCAN_START' }
+  | { type: 'SCAN_SESSION_GET'; sessionId: string }
+  | { type: 'SCAN_FULL_IMAGE_REQUEST'; sessionId: string }
   | { type: 'NAVIGATE_PUSH'; url: string; title?: string }
   | { type: 'NAVIGATE_POP' }
   | { type: 'LIBRARY_FOLDERS' }
@@ -31,6 +33,10 @@ export type Word = { text: string; phonetic: string; start?: number; end?: numbe
 
 export type Folder = { id: string; name: string; sentenceCount: number };
 
+// OCR 인식 결과 한 줄. x/y/w/h는 이미지 크기로 나눈 0~1 값 — 웹이 썸네일을 어떤
+// 크기로 렌더하든 그대로 하이라이트 좌표로 쓸 수 있다. 플랫폼 좌표계 차이는 여기서 흡수한다.
+export type Line = { text: string; x: number; y: number; w: number; h: number };
+
 export type SentenceSummary = {
   id: string;
   text: string;
@@ -46,7 +52,18 @@ export type SentenceSummary = {
 
 // 네이티브가 webviewRef.postMessage(JSON.stringify(...))로 웹에 보내는 메시지.
 export type NativeToWebMessage =
-  | { type: 'PHOTO_CAPTURED'; base64: string }
+  // 이 화면(스캔 트리거 화면)은 썸네일을 그리지 않고 바로 결과 화면으로 넘어가므로
+  // thumb는 여기서 보내지 않는다 — 결과 화면이 새로 마운트되며 SCAN_SESSION_GET으로
+  // 다시 요청한다(화면마다 새 WebView가 뜨는 구조라 데이터를 직접 들고 넘길 수 없다).
+  | { type: 'SCAN_RESULT'; sessionId: string }
+  | { type: 'SCAN_CANCELLED' }
+  | { type: 'SCAN_DENIED' }
+  | { type: 'SCAN_SESSION_GET_OK'; sessionId: string; thumb: string; lines: Line[] }
+  // 실패해도 반드시 답을 보낸다 — 침묵하면 웹은 로딩 스켈레톤에서 영원히 못 빠져나온다.
+  // 'expired'는 연속 촬영으로 세션이 교체된 경우, 'failed'는 디코딩/인식이 던진 경우다.
+  | { type: 'SCAN_SESSION_GET_ERROR'; sessionId: string; reason: 'expired' | 'failed' }
+  | { type: 'SCAN_FULL_IMAGE_OK'; sessionId: string; dataUrl: string }
+  | { type: 'SCAN_FULL_IMAGE_ERROR'; sessionId: string; reason: 'expired' | 'failed' }
   | { type: 'AUDIO_STATE'; key: string; state: AudioState }
   | { type: 'LIBRARY_FOLDERS_OK'; folders: Folder[] }
   | { type: 'LIBRARY_CREATE_FOLDER_OK'; folder: Folder }

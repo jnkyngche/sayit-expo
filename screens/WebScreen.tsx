@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import type { RootStackParamList } from '../navigation/types';
 import type { NativeToWebMessage, WebToNativeMessage } from '../bridge/webMessages';
@@ -20,6 +19,7 @@ import {
   renameFolder,
 } from '../lib/db';
 import { enqueue } from '../lib/download-queue';
+import { capture, createSessionId, fullImageDataUrl, getSessionUri, recognize, saveSession, thumbDataUrl } from '../lib/scan';
 import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from '../config';
 import BouncingDotsLoader from '../components/BouncingDotsLoader';
 
@@ -33,10 +33,6 @@ export default function WebScreen({ route, navigation }: Props) {
   const { url } = route.params;
   const insets = useSafeAreaInsets();
 
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
   const webviewRef = useRef<WebView>(null);
   const canGoBackRef = useRef(false);
 
@@ -70,16 +66,57 @@ export default function WebScreen({ route, navigation }: Props) {
   const handleWebMessage = async (event: WebViewMessageEvent) => {
     const data = JSON.parse(event.nativeEvent.data) as WebToNativeMessage;
     switch (data.type) {
-      case 'OPEN_CAMERA': {
-        if (!permission?.granted) {
-          const result = await requestPermission();
-          if (!result.granted) {
-            Alert.alert('카메라 권한이 필요합니다');
+      case 'SCAN_START': {
+        // 스캐너가 던지면(카메라 하드웨어 오류 등) 웹의 버튼이 'scanning'으로 잠긴 채 남는다.
+        // 어떤 경로로든 반드시 답을 보낸다.
+        try {
+          const shot = await capture();
+          if (shot.status === 'denied') {
+            postToWeb({ type: 'SCAN_DENIED' });
             return;
           }
+          if (shot.status !== 'ok') {
+            postToWeb({ type: 'SCAN_CANCELLED' });
+            return;
+          }
+
+          const sessionId = createSessionId();
+          saveSession(sessionId, shot.uri);
+          postToWeb({ type: 'SCAN_RESULT', sessionId });
+        } catch {
+          postToWeb({ type: 'SCAN_CANCELLED' });
         }
-        setCameraReady(false);
-        setCameraOpen(true);
+        return;
+      }
+      case 'SCAN_SESSION_GET': {
+        const uri = getSessionUri(data.sessionId);
+        if (!uri) {
+          // 연속 촬영으로 세션이 이미 교체됨
+          postToWeb({ type: 'SCAN_SESSION_GET_ERROR', sessionId: data.sessionId, reason: 'expired' });
+          return;
+        }
+        try {
+          // 순차로 돌린다 — Promise.all로 겹치면 12MP 원본을 동시에 두 번 디코딩하게 되고
+          // (장당 약 48MB) 저사양 Android에서 그대로 OOM이다. 어차피 사용자는 둘 다 기다린다.
+          const thumb = await thumbDataUrl(uri);
+          const lines = await recognize(uri);
+          postToWeb({ type: 'SCAN_SESSION_GET_OK', sessionId: data.sessionId, thumb, lines });
+        } catch {
+          postToWeb({ type: 'SCAN_SESSION_GET_ERROR', sessionId: data.sessionId, reason: 'failed' });
+        }
+        return;
+      }
+      case 'SCAN_FULL_IMAGE_REQUEST': {
+        const uri = getSessionUri(data.sessionId);
+        if (!uri) {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_ERROR', sessionId: data.sessionId, reason: 'expired' });
+          return;
+        }
+        try {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_OK', sessionId: data.sessionId, dataUrl: await fullImageDataUrl(uri) });
+        } catch {
+          postToWeb({ type: 'SCAN_FULL_IMAGE_ERROR', sessionId: data.sessionId, reason: 'failed' });
+        }
         return;
       }
       case 'NAVIGATE_PUSH': {
@@ -161,15 +198,6 @@ export default function WebScreen({ route, navigation }: Props) {
     }
   };
 
-  const takePicture = async () => {
-    if (!cameraReady) return;
-    const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.5 });
-    setCameraOpen(false);
-    if (photo?.base64) {
-      postToWeb({ type: 'PHOTO_CAPTURED', base64: photo.base64 });
-    }
-  };
-
   return (
     <View style={styles.container}>
       <View style={[styles.webviewWrapper, { paddingTop: insets.top }]}>
@@ -189,24 +217,6 @@ export default function WebScreen({ route, navigation }: Props) {
           )}
         />
       </View>
-      {cameraOpen && (
-        <View style={StyleSheet.absoluteFill}>
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            onCameraReady={() => setCameraReady(true)}
-          />
-          <TouchableOpacity style={styles.cancelButton} onPress={() => setCameraOpen(false)}>
-            <Text style={styles.cancelText}>취소</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.shutterButton, !cameraReady && styles.shutterButtonDisabled]}
-            onPress={takePicture}
-            disabled={!cameraReady}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -219,25 +229,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: WEBVIEW_BACKGROUND_COLOR,
-  },
-  cancelButton: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-  },
-  cancelText: { color: '#fff', fontSize: 17 },
-  shutterButton: {
-    position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#fff',
-    borderWidth: 4,
-    borderColor: '#ddd',
-  },
-  shutterButtonDisabled: {
-    opacity: 0.4,
   },
 });
