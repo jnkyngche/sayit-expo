@@ -19,7 +19,7 @@ import {
   renameFolder,
 } from '../lib/db';
 import { enqueue } from '../lib/download-queue';
-import { capture, createSessionId, fullImageDataUrl, getSessionUri, recognize, saveSession, thumbDataUrl } from '../lib/scan';
+import { createSessionId, fullImageDataUrl, getSessionUri, recognize, requestCapture, saveSession, thumbDataUrl } from '../lib/scan';
 import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from '../config';
 import BouncingDotsLoader from '../components/BouncingDotsLoader';
 
@@ -67,10 +67,10 @@ export default function WebScreen({ route, navigation }: Props) {
     const data = JSON.parse(event.nativeEvent.data) as WebToNativeMessage;
     switch (data.type) {
       case 'SCAN_START': {
-        // 스캐너가 던지면(카메라 하드웨어 오류 등) 웹의 버튼이 'scanning'으로 잠긴 채 남는다.
+        // 촬영이 던지면(카메라 하드웨어 오류 등) 웹의 버튼이 'scanning'으로 잠긴 채 남는다.
         // 어떤 경로로든 반드시 답을 보낸다.
         try {
-          const shot = await capture();
+          const shot = await requestCapture(() => navigation.navigate('CameraScreen'));
           if (shot.status === 'denied') {
             postToWeb({ type: 'SCAN_DENIED' });
             return;

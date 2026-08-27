@@ -1,9 +1,7 @@
 import { Image } from 'react-native';
-import { Camera } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
-import { File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import DocumentScanner, { ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import { PhotoRecognizer } from 'react-native-vision-camera-ocr-plus';
 import type { Line } from '../bridge/webMessages';
 
@@ -12,43 +10,58 @@ export type CaptureResult =
   | { status: 'cancelled' }
   | { status: 'denied' };
 
-/** 문서 스캐너를 띄운다. OS 팝업은 한 번 거부되면 다시 뜨지 않으므로 앱 레벨 권한을 먼저 확인한다. */
-export async function capture(): Promise<CaptureResult> {
-  const granted = await ensureCameraPermission();
-  if (!granted) return { status: 'denied' };
+/**
+ * 촬영은 네이티브 스택의 별도 화면(CameraScreen)에서 일어나므로 함수 호출로 결과를 되받을 수
+ * 없다. SCAN_START 핸들러가 await할 수 있도록 promise의 resolve를 여기 붙잡아둔다.
+ *
+ * 예전에는 react-native-document-scanner-plugin을 썼는데, iOS에서는 maxNumDocuments가
+ * 무시된다(Android 모듈에만 구현되어 있다). VisionKit의 다중 페이지 스캐너가 그대로 떠서
+ * "스캔 유지"를 누르면 결과가 아니라 카메라로 되돌아가고, "저장"을 누르기 전에는 콜백이
+ * 오지 않는다 — 사용자 눈에는 사진만 계속 찍히고 결과 화면이 안 뜨는 것으로 보인다.
+ */
+let pendingCapture: ((result: CaptureResult) => void) | null = null;
 
-  const { status, scannedImages } = await DocumentScanner.scanDocument({
-    maxNumDocuments: 1,
-    croppedImageQuality: 100, // 재압축 아티팩트가 얇은 활자 인식률을 깎는다 — 낮추지 않는다
+export function requestCapture(openCameraScreen: () => void): Promise<CaptureResult> {
+  settleCapture({ status: 'cancelled' }); // 화면 전환 중 중복 탭으로 남은 요청을 정리한다
+  return new Promise((resolve) => {
+    pendingCapture = resolve;
+    openCameraScreen();
   });
+}
 
-  return status === ScanDocumentResponseStatus.Success && scannedImages?.[0]
-    ? { status: 'ok', uri: adoptIntoCache(scannedImages[0]) }
-    : { status: 'cancelled' };
+/** CameraScreen이 촬영·취소·거부 중 무엇으로 끝났든 반드시 한 번 호출한다. */
+export function settleCapture(result: CaptureResult) {
+  const resolve = pendingCapture;
+  pendingCapture = null;
+  resolve?.(result);
 }
 
 /**
- * 스캐너가 저장한 원본을 캐시 디렉터리로 옮긴다.
+ * 촬영 직후 원본을 인식용으로 정규화한다.
  *
- * iOS 플러그인은 Documents/에 저장하는데(react-native-document-scanner-plugin의
- * FileUtil.createImageFile), 거기 있는 파일은 iCloud 백업 대상이고 OS가 회수하지도 않는다.
- * 앱이 다음 촬영 전에 종료되면 discardSession이 못 돌아 12MP JPEG가 그대로 남는다 —
- * 실행할 때마다 한 장씩 사용자 백업 용량을 먹는 셈이다. 재촬영하면 다시 만들 수 있는
- * 임시 이미지이므로 캐시가 맞는 자리다.
- *
- * Android의 content:// URI는 우리가 만든 파일이 아니라 손대지 않고 그대로 쓴다.
+ * 두 가지를 한 번에 해결한다. (1) 카메라가 남기는 EXIF 회전 정보를 픽셀에 구워 넣는다 —
+ * Image.getSize와 ML Kit이 회전을 다르게 해석하면 인식 자체는 되는데 줄 좌표만 90도 어긋난다.
+ * (2) 12MP 원본은 디코딩할 때마다 약 48MB를 먹는데, 활자 인식에 그 해상도가 필요하지 않다.
  */
-function adoptIntoCache(uri: string): string {
-  if (!uri.startsWith('file://')) return uri;
-  try {
-    const source = new File(uri);
-    if (!source.exists) return uri;
-    source.moveSync(new File(Paths.cache, `scan-${Date.now()}.jpg`));
-    return source.uri; // moveSync는 uri를 새 위치로 갱신한다
-  } catch {
-    // 옮기지 못해도 인식 자체는 원래 경로로 계속 진행할 수 있다 — 촬영을 실패시키지 않는다.
-    return uri;
-  }
+const OCR_MAX_LONG_SIDE = 2560;
+
+export async function normalizeCapture(uri: string): Promise<string> {
+  const { width, height } = await getImageSize(uri);
+  const scale = Math.min(1, OCR_MAX_LONG_SIDE / Math.max(width, height));
+  const resize =
+    scale < 1
+      ? width >= height
+        ? { width: Math.round(width * scale) }
+        : { height: Math.round(height * scale) }
+      : undefined;
+
+  const result = await ImageManipulator.manipulateAsync(uri, resize ? [{ resize }] : [], {
+    compress: 1, // 재압축 아티팩트가 얇은 활자 인식률을 깎는다 — 낮추지 않는다
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  deleteQuietly(uri); // 정규화본만 세션에 남기고 원본은 즉시 버린다
+  return result.uri;
 }
 
 /** ML Kit(iOS/Android 공통) 반환 구조를 하나의 Line[]으로 눌러 담는다. */
@@ -82,11 +95,11 @@ export async function recognize(uri: string): Promise<Line[]> {
 type ScanSession = { uri: string };
 
 // 세션은 한 번에 하나만 살려둔다 — 연속 촬영마다 이전 이미지를 즉시 해제해야
-// 저사양 Android에서 12MP 디코딩(장당 약 48MB)이 누적되어 죽는 걸 막을 수 있다.
+// 저사양 기기에서 캐시와 디코딩 메모리가 누적되지 않는다.
 let currentSession: { id: string; session: ScanSession } | null = null;
 
 export function saveSession(sessionId: string, uri: string) {
-  if (currentSession) discardSession(currentSession.session);
+  if (currentSession) deleteQuietly(currentSession.session.uri);
   currentSession = { id: sessionId, session: { uri } };
 }
 
@@ -94,12 +107,13 @@ export function getSessionUri(sessionId: string): string | null {
   return currentSession?.id === sessionId ? currentSession.session.uri : null;
 }
 
-function discardSession(session: ScanSession) {
+function deleteQuietly(uri: string) {
+  if (!uri.startsWith('file://')) return; // 우리가 만든 파일이 아니면 손대지 않는다
   try {
-    const file = new File(session.uri);
+    const file = new File(uri);
     if (file.exists) file.delete();
   } catch {
-    // 스캐너가 이미 정리한 임시 파일일 수 있다 — 무시한다.
+    // OS가 이미 회수한 캐시 파일일 수 있다 — 무시한다.
   }
 }
 
@@ -129,14 +143,6 @@ export async function fullImageDataUrl(uri: string): Promise<string> {
 
 export function createSessionId(): string {
   return Crypto.randomUUID();
-}
-
-async function ensureCameraPermission(): Promise<boolean> {
-  const current = await Camera.getCameraPermissionsAsync();
-  if (current.granted) return true;
-  if (!current.canAskAgain) return false;
-  const result = await Camera.requestCameraPermissionsAsync();
-  return result.granted;
 }
 
 function getImageSize(uri: string): Promise<{ width: number; height: number }> {
