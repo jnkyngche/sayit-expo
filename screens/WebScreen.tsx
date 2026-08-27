@@ -123,6 +123,10 @@ export default function WebScreen({ route, navigation }: Props) {
         navigation.push('WebScreen', { url: resolveWebViewUrl(data.url), title: data.title });
         return;
       }
+      case 'NAVIGATE_REPLACE': {
+        navigation.replace('WebScreen', { url: resolveWebViewUrl(data.url), title: data.title });
+        return;
+      }
       case 'NAVIGATE_POP': {
         if (navigation.canGoBack()) navigation.goBack();
         return;
