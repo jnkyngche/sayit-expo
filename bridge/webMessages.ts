@@ -7,6 +7,8 @@ export type WebToNativeMessage =
   | { type: 'SCAN_SESSION_GET'; sessionId: string }
   | { type: 'SCAN_FULL_IMAGE_REQUEST'; sessionId: string }
   | { type: 'NAVIGATE_PUSH'; url: string; title?: string }
+  // 지금 화면을 스택에서 빼고 그 자리에 새 화면을 올린다. 뒤로가기가 이 화면을 건너뛴다.
+  | { type: 'NAVIGATE_REPLACE'; url: string; title?: string }
   | { type: 'NAVIGATE_POP' }
   | { type: 'LIBRARY_FOLDERS' }
   | { type: 'LIBRARY_CREATE_FOLDER'; name: string }
