@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync } from 'expo-audio';
 import WebScreen from './screens/WebScreen';
+import CameraScreen from './screens/CameraScreen';
 import type { RootStackParamList } from './navigation/types';
 import { WEBVIEW_URL } from './config';
 import { bootstrapAudioStore } from './lib/audio-store';
@@ -31,6 +32,12 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="WebScreen" component={WebScreen} initialParams={{ url: WEBVIEW_URL }} />
+          {/* 촬영 화면은 웹뷰 위로 덮이는 전체화면이라 웹뷰 배경색(paper)이 비치면 안 된다. */}
+          <Stack.Screen
+            name="CameraScreen"
+            component={CameraScreen}
+            options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
       <StatusBar style="auto" />

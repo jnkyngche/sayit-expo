@@ -36,9 +36,11 @@
       "expo-sqlite",
       "expo-audio",
       [
-        "react-native-document-scanner-plugin",
+        "expo-camera",
         {
-          "cameraPermission": "교재를 촬영해 영어 문장을 인식합니다."
+          "cameraPermission": "교재를 촬영해 영어 문장을 인식합니다.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ]
     ],
