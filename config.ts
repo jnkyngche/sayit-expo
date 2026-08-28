@@ -8,5 +8,3 @@ export const WEBVIEW_INK_COLOR = '#14140d'; // --ink
 export const WEBVIEW_MUTED_COLOR = 'rgba(20, 20, 13, 0.56)'; // --muted
 export const WEBVIEW_LINE_COLOR = 'rgba(20, 20, 13, 0.14)'; // --line
 export const WEBVIEW_ACCENT_COLOR = '#e4e724'; // --accent
-
-export const LOADING_SPINNER_COLOR = '#e4e724';
