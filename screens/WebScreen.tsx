@@ -21,7 +21,10 @@ import {
 import { enqueue } from '../lib/download-queue';
 import { createSessionId, fullImageDataUrl, getSessionUri, recognize, requestCapture, saveSession, thumbDataUrl } from '../lib/scan';
 import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from '../config';
-import BouncingDotsLoader from '../components/BouncingDotsLoader';
+import { LOADING_PROBE_SCRIPT, WEBVIEW_FIRST_PAINT, type LoadingProbeMessage } from '../bridge/loadingProbe';
+import { useWebViewLoad } from '../lib/webview-load';
+import WebViewLoadingOverlay from '../components/WebViewLoadingOverlay';
+import WebViewErrorView from '../components/WebViewErrorView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebScreen'>;
 
@@ -35,11 +38,14 @@ export default function WebScreen({ route, navigation }: Props) {
 
   const webviewRef = useRef<WebView>(null);
   const canGoBackRef = useRef(false);
+  const load = useWebViewLoad(url);
 
+  // reloadKey가 바뀌면 WebView가 통째로 새로 마운트되므로 ref도 새것이다 —
+  // 다시 등록하지 않으면 브릿지가 죽은 웹뷰에 메시지를 밀어 넣게 된다.
   useEffect(() => {
     if (!webviewRef.current) return;
     return registerWebView(webviewRef.current);
-  }, []);
+  }, [load.reloadKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,7 +70,12 @@ export default function WebScreen({ route, navigation }: Props) {
   };
 
   const handleWebMessage = async (event: WebViewMessageEvent) => {
-    const data = JSON.parse(event.nativeEvent.data) as WebToNativeMessage;
+    const data = JSON.parse(event.nativeEvent.data) as WebToNativeMessage | LoadingProbeMessage;
+    // 웹 계약이 아니라 네이티브가 주입한 스크립트가 보내는 신호다(bridge/loadingProbe.ts).
+    if (data.type === WEBVIEW_FIRST_PAINT) {
+      load.markFirstPaint();
+      return;
+    }
     switch (data.type) {
       case 'SCAN_START': {
         // 촬영이 던지면(카메라 하드웨어 오류 등) 웹의 버튼이 'scanning'으로 잠긴 채 남는다.
@@ -206,6 +217,8 @@ export default function WebScreen({ route, navigation }: Props) {
     <View style={styles.container}>
       <View style={[styles.webviewWrapper, { paddingTop: insets.top }]}>
         <WebView
+          // 로드가 실패한 뒤의 reload()는 플랫폼에 따라 먹지 않는다. 다시 시도는 웹뷰를 새로 만든다.
+          key={load.reloadKey}
           ref={webviewRef}
           source={{ uri: url }}
           onMessage={handleWebMessage}
@@ -213,13 +226,27 @@ export default function WebScreen({ route, navigation }: Props) {
             canGoBackRef.current = nav.canGoBack;
           }}
           style={styles.webview}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
-              <BouncingDotsLoader />
-            </View>
-          )}
+          // 첫 페인트를 알리는 스크립트. 문서보다 먼저 심어야 페인트 관측을 놓치지 않는다.
+          injectedJavaScriptBeforeContentLoaded={LOADING_PROBE_SCRIPT}
+          {...load.handlers}
         />
+
+        {/* 로더는 웹뷰 위를 덮기만 한다 — 웹뷰 자체에 opacity를 걸면 안드로이드에서 렌더가 깨진다. */}
+        <WebViewLoadingOverlay
+          visible={load.loaderVisible}
+          label={load.label}
+          progress={load.progress}
+          slow={load.slow}
+          onRetry={load.retry}
+        />
+
+        {load.phase === 'error' && load.error ? (
+          <WebViewErrorView
+            error={load.error}
+            onRetry={load.retry}
+            onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -229,9 +256,4 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   webviewWrapper: { flex: 1, backgroundColor: WEBVIEW_BACKGROUND_COLOR },
   webview: { flex: 1, backgroundColor: WEBVIEW_BACKGROUND_COLOR },
-  loadingOverlay: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: WEBVIEW_BACKGROUND_COLOR,
-  },
 });
