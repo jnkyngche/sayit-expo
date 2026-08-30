@@ -64,10 +64,29 @@ export function migrateDb() {
       ON saved_sentence(folder_id, saved_at DESC);
     CREATE INDEX IF NOT EXISTS idx_sentence_key
       ON saved_sentence(audio_key);
+
+    -- 설정은 몇 줄뿐이라 컬럼을 늘리는 대신 key/value로 둔다. 새 설정이 늘어도
+    -- 마이그레이션이 필요 없다.
+    CREATE TABLE IF NOT EXISTS app_setting (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // 부팅 시 1회 — 다운로드 중에 앱이 죽어 영원히 'downloading'으로 남은 행을 되돌린다.
   db.runSync("UPDATE saved_sentence SET audio_state = 'none' WHERE audio_state = 'downloading'");
+}
+
+export function readSetting(key: string): string | null {
+  const row = db.getFirstSync<{ value: string }>('SELECT value FROM app_setting WHERE key = ?', [key]);
+  return row?.value ?? null;
+}
+
+export function writeSetting(key: string, value: string) {
+  db.runSync(
+    'INSERT INTO app_setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, value]
+  );
 }
 
 export function deleteSentence(id: string) {
