@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { BackHandler, Linking, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +65,15 @@ export default function WebScreen({ route, navigation }: Props) {
       return () => subscription.remove();
     }, [navigation])
   );
+
+  const handleShouldStartLoad = (request: WebViewNavigation) => {
+    if (request.url.startsWith('http://') || request.url.startsWith('https://')) return true;
+
+    Linking.openURL(request.url).catch(() => {
+      // 메일 앱이 없는 기기 등. 열지 못해도 웹뷰가 엉뚱한 주소로 가버리는 것보다는 낫다.
+    });
+    return false;
+  };
 
   const postToWeb = (message: NativeToWebMessage) => {
     webviewRef.current?.postMessage(JSON.stringify(message));
@@ -235,6 +244,9 @@ export default function WebScreen({ route, navigation }: Props) {
           onNavigationStateChange={(nav: WebViewNavigation) => {
             canGoBackRef.current = nav.canGoBack;
           }}
+          // 설정의 "문의하기"(mailto:) 같은 링크는 웹뷰가 열 수 없다 — 그대로 두면
+          // 아무 일도 안 일어난 것처럼 보인다. 앱 밖으로 나갈 주소는 OS에 넘긴다.
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
           style={styles.webview}
           // 첫 페인트를 알리는 스크립트. 문서보다 먼저 심어야 페인트 관측을 놓치지 않는다.
           injectedJavaScriptBeforeContentLoaded={LOADING_PROBE_SCRIPT}
