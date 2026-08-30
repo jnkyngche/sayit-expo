@@ -9,6 +9,7 @@ import CameraScreen from './screens/CameraScreen';
 import type { RootStackParamList } from './navigation/types';
 import { WEBVIEW_URL } from './config';
 import { bootstrapAudioStore } from './lib/audio-store';
+import { bootstrapNotifications } from './lib/app-settings';
 import { migrateDb } from './lib/db';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -17,6 +18,8 @@ export default function App() {
   useEffect(() => {
     bootstrapAudioStore();
     migrateDb();
+    // 알림 표시 방식과 Android 채널. 실제 스케줄은 설정 화면에서 켤 때 걸린다.
+    bootstrapNotifications();
     // 재생은 웹뷰 안 Web Audio API가 하지만, iOS에서 WKWebView의 오디오 세션은
     // 앱 전체(AVAudioSession) 설정을 따라간다 — 여기서 안 켜면 무음 스위치가
     // 켜진 기기에서 발음이 전혀 안 들린다.
