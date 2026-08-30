@@ -26,7 +26,20 @@ export type WebToNativeMessage =
   | { type: 'LIBRARY_DELETE'; sentenceId: string }
   | { type: 'SENTENCE_GET'; sentenceId: string }
   | { type: 'AUDIO_REQUEST'; sentenceId: string }
-  | { type: 'AUDIO_PREFETCH'; sentenceIds: string[] };
+  | { type: 'AUDIO_PREFETCH'; sentenceIds: string[] }
+  | { type: 'SETTINGS_GET' }
+  | { type: 'SETTINGS_SET_REMINDER'; enabled: boolean; hour: number; minute: number };
+
+// 앱 설정. 알림 스케줄도 앱 버전도 네이티브만 아는 값이라 네이티브가 원본을 들고 있고,
+// 웹은 SETTINGS_GET으로 읽고 SETTINGS_SET_REMINDER로 바꿔달라고 요청만 한다.
+// 웹이 자체 상태로 기억하면 OS 설정에서 알림을 꺼버린 경우와 어긋난다.
+export type AppSettings = {
+  reminderEnabled: boolean;
+  /** 기기 로컬 시각 0~23 */
+  reminderHour: number;
+  reminderMinute: number;
+  appVersion: string;
+};
 
 export type AudioState = 'none' | 'downloading' | 'ready';
 
@@ -78,4 +91,8 @@ export type NativeToWebMessage =
   // PronunciationPlayer가 Web Audio API로 직접 decodeAudioData하므로 data: URL이 아니라
   // raw base64로 보낸다 — data: URL로 감싸면 웹에서 다시 base64ToArrayBuffer 전에 벗겨내야 한다.
   | { type: 'AUDIO_READY'; sentenceId: string; base64: string }
-  | { type: 'AUDIO_ERROR'; sentenceId: string; reason: 'offline' | 'not_found' };
+  | { type: 'AUDIO_ERROR'; sentenceId: string; reason: 'offline' | 'not_found' }
+  | { type: 'SETTINGS_OK'; settings: AppSettings }
+  // OS 알림 권한이 거부된 경우. settings.reminderEnabled는 false로 보낸다 — 웹이 토글을
+  // 되돌리고 "설정 앱에서 알림을 켜주세요"를 안내한다.
+  | { type: 'SETTINGS_REMINDER_DENIED'; settings: AppSettings };
