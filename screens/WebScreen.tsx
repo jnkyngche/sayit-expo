@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../navigation/types';
 import type { NativeToWebMessage, WebToNativeMessage } from '../bridge/webMessages';
 import { registerWebView } from '../lib/bridge';
 import { audioKey, ensureAudio } from '../lib/audio-store';
+import { getAppSettings, setReminder } from '../lib/app-settings';
 import {
   createFolder,
   deleteSentence,
@@ -208,6 +209,15 @@ export default function WebScreen({ route, navigation }: Props) {
           const speak = getSentenceSpeakParams(sentenceId);
           if (speak) enqueue(speak.audioKey, speak.params);
         }
+        return;
+      }
+      case 'SETTINGS_GET': {
+        postToWeb({ type: 'SETTINGS_OK', settings: await getAppSettings() });
+        return;
+      }
+      case 'SETTINGS_SET_REMINDER': {
+        const { settings, denied } = await setReminder(data.enabled, data.hour, data.minute);
+        postToWeb({ type: denied ? 'SETTINGS_REMINDER_DENIED' : 'SETTINGS_OK', settings });
         return;
       }
     }
