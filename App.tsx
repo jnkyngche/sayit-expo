@@ -33,7 +33,11 @@ export default function App() {
     setAudioModeAsync({
       playsInSilentMode: true,
       interruptionMode: 'duckOthers',
-      shouldPlayInBackground: false, // 연속 재생을 넣을 때 true + 잠금화면 컨트롤
+      // 연속 재생을 넣을 때 true + 잠금화면 컨트롤. 그때는 app.json의 expo-audio
+      // enableBackgroundPlayback도 같이 켜야 한다 — 여기만 켜면 OS가 백그라운드에서
+      // 오디오 세션을 끊는다. 반대로 그쪽만 켜두면 쓰지도 않는 백그라운드 오디오를
+      // 선언한 셈이 되어 심사에서 걸린다.
+      shouldPlayInBackground: false,
     });
   }, []);
 
