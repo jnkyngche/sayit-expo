@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#faf8ef",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jnkyche.sayit",
@@ -16,7 +17,7 @@
     "android": {
       "package": "com.jnkyche.sayit",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#faf8ef",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -43,6 +44,29 @@
           "cameraPermission": "교재를 촬영해 영어 문장을 인식합니다.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 88,
+          "resizeMode": "contain",
+          "backgroundColor": "#faf8ef"
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Inter",
+                "fontDefinitions": [{ "path": "./assets/fonts/Inter-ExtraBold.ttf", "weight": 800 }]
+              }
+            ]
+          },
+          "ios": { "fonts": ["./assets/fonts/Inter-ExtraBold.ttf"] }
         }
       ],
       "./plugins/withoutPushEntitlement"

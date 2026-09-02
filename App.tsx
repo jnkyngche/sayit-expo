@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -7,12 +7,19 @@ import { setAudioModeAsync } from 'expo-audio';
 import WebScreen from './screens/WebScreen';
 import CameraScreen from './screens/CameraScreen';
 import type { RootStackParamList } from './navigation/types';
-import { WEBVIEW_URL } from './config';
+import { WEBVIEW_BACKGROUND_COLOR, WEBVIEW_URL } from './config';
 import { bootstrapAudioStore } from './lib/audio-store';
 import { bootstrapNotifications } from './lib/app-settings';
 import { migrateDb } from './lib/db';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// 화면이 아직 안 그려진 순간에 드러나는 바탕색. 기본 테마는 밝은 회색이라 스플래시(종이색)와
+// 웹뷰(종이색) 사이에서 한 프레임 번쩍인다 — 실행부터 첫 화면까지 같은 색으로 잇는다.
+const navigationTheme: Theme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: WEBVIEW_BACKGROUND_COLOR },
+};
 
 export default function App() {
   useEffect(() => {
@@ -32,7 +39,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="WebScreen" component={WebScreen} initialParams={{ url: WEBVIEW_URL }} />
           {/* 촬영 화면은 웹뷰 위로 덮이는 전체화면이라 웹뷰 배경색(paper)이 비치면 안 된다. */}
