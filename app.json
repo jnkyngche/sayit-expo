@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "sayIt-expo",
+    "name": "sayIt",
     "slug": "sayIt-expo",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,12 +8,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jnkyche.sayIt-expo",
+      "bundleIdentifier": "com.jnkyche.sayit",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.jnkyche.sayit",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
