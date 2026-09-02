@@ -147,6 +147,11 @@ const styles = StyleSheet.create({
     backgroundColor: WEBVIEW_ACCENT_COLOR,
   },
   wordmark: {
+    // 앱 아이콘·스플래시와 같은 글자체다(assets/fonts/Inter-ExtraBold.ttf, SIL OFL).
+    // 시스템 폰트를 쓰면 iOS는 SF Pro, Android는 Roboto로 갈려서 스플래시에서 이 화면으로
+    // 넘어오는 순간 글자 모양이 바뀐다. app.json의 expo-font 플러그인이 네이티브에 심어두므로
+    // useFonts 없이 첫 프레임부터 쓸 수 있다 — 로딩 화면이라 비동기 로딩을 기다릴 수 없다.
+    fontFamily: 'Inter',
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.6,
