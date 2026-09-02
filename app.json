@@ -77,7 +77,15 @@
           "ios": { "fonts": ["./assets/fonts/Inter-ExtraBold.ttf"] }
         }
       ],
-      "./plugins/withoutPushEntitlement"
+      "./plugins/withoutPushEntitlement",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
