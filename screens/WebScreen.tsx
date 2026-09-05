@@ -303,7 +303,12 @@ export default function WebScreen({ route, navigation }: Props) {
           allowsLinkPreview={false}
           // iOS: 기본값이 phoneNumber다. 영어 예문 안의 숫자열이 전화번호로 링크화되고,
           // 누르면 전화 앱이 열린다.
-          dataDetectorTypes="none"
+          //
+          // 반드시 배열로 넘긴다. 공개 타입은 문자열도 받게 되어 있어(DataDetectorTypes |
+          // DataDetectorTypes[]) 타입 검사는 통과하지만, Fabric 네이티브 프롭은 배열로만
+          // 코드젠되어 있다. 문자열을 주면 iOS 전용 프롭인데도 안드로이드가 프롭을 읽다가
+          // RawValue 캐스팅 단정에 걸려 SIGABRT로 즉사한다.
+          dataDetectorTypes={['none']}
           // Android: 두 손가락으로 페이지가 확대·축소되면 브라우저라는 게 바로 드러난다.
           setBuiltInZoomControls={false}
           // Android: 스크롤 끝에서 번지는 글로우.
