@@ -73,12 +73,15 @@ export function useWebViewLoad(sourceUrl: string) {
 
   const phaseRef = useRef<Phase>('loading');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // 로더는 따로 잡아 둔다 — 진행률이 다 차면 아직 안 뜬 로더만 골라 취소한다.
+  const loaderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mainUrl = useRef(sourceUrl);
   const crashes = useRef(0);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
+    loaderTimer.current = null;
   }, []);
 
   const enterPhase = useCallback((next: Phase) => {
@@ -119,8 +122,9 @@ export function useWebViewLoad(sourceUrl: string) {
       setLoaderVisible(false);
       setSlow(false);
     }
+    loaderTimer.current = setTimeout(() => setLoaderVisible(true), LOADER_GRACE_MS);
     timers.current.push(
-      setTimeout(() => setLoaderVisible(true), LOADER_GRACE_MS),
+      loaderTimer.current,
       setTimeout(() => setSlow(true), copy.slowAfterMs),
       setTimeout(() => fail({ kind: 'unknown', detail: `응답 없음 (${LOAD_TIMEOUT_MS / 1000}s timeout)` }), LOAD_TIMEOUT_MS)
     );
@@ -158,11 +162,31 @@ export function useWebViewLoad(sourceUrl: string) {
     [beginLoad]
   );
 
-  const onLoadProgress = useCallback((event: EventOf<'onLoadProgress'>) => {
-    if (phaseRef.current !== 'loading') return;
-    const next = event.nativeEvent.progress;
-    setProgress((value) => (next > value ? next : value));
-  }, []);
+  const onLoadProgress = useCallback(
+    (event: EventOf<'onLoadProgress'>) => {
+      if (phaseRef.current !== 'loading') return;
+      const next = event.nativeEvent.progress;
+      setProgress((value) => (next > value ? next : value));
+      // Android는 웹의 history 변경(Next.js 같은 SPA 라우팅의 pushState)에서도 로딩을
+      // 시작한 것처럼 알린다 — RNCWebViewClient.doUpdateVisitedHistory가 onLoadStart를
+      // 그대로 발사한다. 그런데 문서를 새로 받는 게 아니라서 onLoadEnd는 끝내 오지 않고,
+      // 진행률만 1까지 올라간 채 멈춘다. markReady를 부르는 게 onLoadEnd뿐이면 그 화면은
+      // 로딩에 갇혀 타임아웃 오류로 끝난다(보관함 탭이 이 경로였다).
+      //
+      // 진행률이 다 찼다는 건 더 받을 게 없다는 뜻이니 여기서도 완료로 친다. 실제 문서
+      // 로드에서는 onLoadEnd가 거의 같은 시점에 오므로 둘 중 먼저 온 쪽이 이긴다.
+      if (next >= 1) {
+        // 받을 게 남지 않았으면 화면은 곧 뜬다. 아직 안 뜬 로더는 여기서 취소한다 —
+        // 안 그러면 이미 그려져 있는 화면 위로 로더가 잠깐 떴다 사라진다.
+        if (loaderTimer.current) {
+          clearTimeout(loaderTimer.current);
+          loaderTimer.current = null;
+        }
+        timers.current.push(setTimeout(markReady, FIRST_PAINT_FALLBACK_MS));
+      }
+    },
+    [markReady]
+  );
 
   const onLoadEnd = useCallback(() => {
     if (phaseRef.current !== 'loading') return;
